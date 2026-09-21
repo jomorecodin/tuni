@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env*.local
+
+# Next.js
+.next/
+out/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+clave.txt
+
+# Build
+dist/
+build/
+
+# Binary documents (keep in Drive/local, not git)
+*.pdf
+*.docx
+*.zip
+
+# Old prototype
+tuni/
+
+# Claude local settings
+.claude/
