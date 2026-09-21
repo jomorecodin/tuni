@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { RefreshCw, Users, BookOpen, Download } from "lucide-react"
+import { useState, useEffect, useCallback, type FormEvent } from "react"
+import { RefreshCw, Users, BookOpen, Download, Lock } from "lucide-react"
 import {
   BarChart,
   Bar,
@@ -19,6 +19,7 @@ import { studentSurvey } from "@/lib/survey-student"
 import { professorSurvey } from "@/lib/survey-professor"
 import type { SurveyDefinition, Question } from "@/lib/survey-types"
 
+const ADMIN_KEY = "0123456789"
 const COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5", "#6b7280", "#9ca3af", "#d1d5db"]
 
 interface ResponseRow {
@@ -28,6 +29,55 @@ interface ResponseRow {
 }
 
 export default function AdminDashboard() {
+  const [authed, setAuthed] = useState(false)
+  const [key, setKey] = useState("")
+  const [keyError, setKeyError] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("admin_ok") === "1") {
+      setAuthed(true)
+    }
+  }, [])
+
+  function handleLogin(e: FormEvent) {
+    e.preventDefault()
+    if (key === ADMIN_KEY) {
+      sessionStorage.setItem("admin_ok", "1")
+      setAuthed(true)
+    } else {
+      setKeyError(true)
+    }
+  }
+
+  if (!authed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <form onSubmit={handleLogin} className="bg-white rounded-xl shadow-lg p-8 w-80">
+          <div className="flex justify-center mb-4">
+            <Lock className="w-10 h-10 text-orange-500" />
+          </div>
+          <h2 className="text-lg font-semibold text-center text-gray-800 mb-4">Panel Administrativo</h2>
+          <input
+            type="password"
+            value={key}
+            onChange={(e) => { setKey(e.target.value); setKeyError(false) }}
+            placeholder="Clave de acceso"
+            className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${keyError ? "border-red-400" : "border-gray-300"}`}
+            autoFocus
+          />
+          {keyError && <p className="text-xs text-red-500 mt-1">Clave incorrecta</p>}
+          <button type="submit" className="w-full mt-4 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg text-sm transition-colors">
+            Entrar
+          </button>
+        </form>
+      </div>
+    )
+  }
+
+  return <DashboardContent />
+}
+
+function DashboardContent() {
   const [tab, setTab] = useState<"estudiante" | "profesor">("estudiante")
   const [studentData, setStudentData] = useState<ResponseRow[]>([])
   const [professorData, setProfessorData] = useState<ResponseRow[]>([])
