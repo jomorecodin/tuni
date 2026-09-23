@@ -1,0 +1,23 @@
+materia: Matematicas IV
+codigo: BPTMI04
+trimestre: 5
+carrera: Ingenieria de Sistemas
+evaluaciones:
+- tipo: parcial_1
+  nombre: Primer Parcial
+  fecha: '2026-10-15'
+  temas:
+  - (pendiente)
+  peso: 20
+- tipo: parcial_2
+  nombre: Segundo Parcial
+  fecha: '2026-11-12'
+  temas:
+  - (pendiente)
+  peso: 20
+- tipo: parcial_3
+  nombre: Tercer Parcial
+  fecha: '2026-12-03'
+  temas:
+  - (pendiente)
+  peso: 20

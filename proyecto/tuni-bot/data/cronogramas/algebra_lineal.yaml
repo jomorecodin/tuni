@@ -1,0 +1,69 @@
+materia: Algebra Lineal
+codigo: BPTMI31
+trimestre: 5
+carrera: Ingenieria de Sistemas
+evaluaciones:
+- tipo: quiz_test
+  nombre: Quiz de prueba
+  fecha: '2026-09-21'
+  temas:
+  - Matriz escalonada
+  - Gauss y Gauss-Jordan
+  - Espacios vectoriales definicion
+  peso: 5
+- tipo: actividad_colaborativa_1
+  nombre: Actividad Colaborativa I
+  fecha: '2026-10-06'
+  temas:
+  - Espacios vectoriales
+  - Subespacios
+  - Combinacion lineal y espacio generado
+  - Dependencia e independencia lineal
+  - Base y dimension
+  - Cambio de base
+  - Bases ortonormales
+  - Gram-Schmidt
+  peso: 10
+- tipo: parcial_1
+  nombre: Primer Parcial
+  fecha: '2026-10-09'
+  temas:
+  - Espacios vectoriales y subespacios
+  - Combinacion lineal y espacio generado
+  - Dependencia e independencia lineal
+  - Base y dimension
+  - Espacio fila, columna, nulo, rango y nulidad
+  - Cambio de base y matriz de transicion
+  - Bases ortonormales y Gram-Schmidt
+  peso: 30
+- tipo: taller_autoaprendizaje
+  nombre: Taller de Autoaprendizaje
+  fecha: '2026-10-29'
+  temas:
+  - Transformaciones lineales
+  - Representacion matricial
+  - Autovalores y autovectores
+  - Matrices semejantes y diagonalizacion
+  peso: 20
+- tipo: actividad_colaborativa_2
+  nombre: Actividad Colaborativa II
+  fecha: '2026-11-19'
+  temas:
+  - Factorizacion LU y PLU
+  - Factorizacion QR
+  - Factorizacion SVD
+  peso: 10
+- tipo: parcial_2
+  nombre: Segundo Parcial
+  fecha: '2026-11-24'
+  temas:
+  - Factorizacion LU y PLU
+  - Factorizacion QR
+  - Valores singulares y SVD
+  peso: 30
+- tipo: recuperacion
+  nombre: Examen de Recuperacion
+  fecha: '2026-11-26'
+  temas:
+  - Contenido del parcial que se recupera
+  peso: 30

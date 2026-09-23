@@ -1,0 +1,58 @@
+materia: Matematicas Discretas
+codigo: BPTMI30
+trimestre: 4
+carrera: Ingenieria de Sistemas
+evaluaciones:
+- tipo: parcial_1
+  nombre: Primer Parcial
+  fecha: '2026-10-08'
+  temas:
+  - Principios de conteo (suma y producto)
+  - Permutaciones sin repeticion
+  - Notacion factorial
+  - Permutaciones con elementos repetidos
+  - Combinaciones
+  - Teorema del binomio
+  - Combinaciones con repeticion
+  - Distribuciones
+  peso: 30
+- tipo: taller_grupal_1
+  nombre: Taller Grupal 1
+  fecha: '2026-10-22'
+  temas:
+  - Equivalencia logica y leyes logicas
+  - Circuitos
+  - Implicacion logica y reglas de inferencia
+  - Argumentos
+  - Cuantificadores
+  peso: 15
+- tipo: parcial_2
+  nombre: Segundo Parcial
+  fecha: '2026-11-12'
+  temas:
+  - Conjuntos y subconjuntos
+  - Cardinal y conjunto potencia
+  - Operaciones entre conjuntos
+  - Tablas de pertenencia
+  - Principio de inclusion-exclusion
+  - Producto cartesiano
+  - Relaciones y representaciones graficas
+  - Propiedades de las relaciones
+  peso: 30
+- tipo: taller_grupal_2
+  nombre: Taller Grupal 2
+  fecha: '2026-11-26'
+  temas:
+  - Relaciones de orden parcial y total
+  - Diagramas de Hasse
+  - Elementos distinguidos
+  - Particion de un conjunto
+  - Relacion de equivalencia
+  - Clases de equivalencia
+  peso: 10
+- tipo: recuperacion
+  nombre: Recuperacion
+  fecha: '2026-12-01'
+  temas:
+  - Contenido del parcial que se recupera
+  peso: 30
