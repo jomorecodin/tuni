@@ -33,7 +33,6 @@ from app.bot.handlers.chat import handle_message
 from app.bot.handlers.commands import (
     help_command,
     materia_command,
-    nueva_command,
     estado_command,
     horario_command,
 )
@@ -97,10 +96,9 @@ def create_application():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, unclear_response),
             ],
             State.CHATTING: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message),
                 CommandHandler("materia", materia_command),
-                CommandHandler("nueva", nueva_command),
                 CommandHandler("horario", horario_command),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message),
             ],
         },
         fallbacks=[

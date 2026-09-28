@@ -1,4 +1,4 @@
-"""Slash command handlers: /ayuda, /materia, /nueva, /estado, /horario."""
+"""Slash command handlers: /ayuda, /materia, /estado, /horario."""
 
 import logging
 
@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes
 from app.bot.constants import State, STRINGS
 from app.bot.keyboards import build_subject_keyboard
 from app.bot.services.session_manager import close_session
-from app.bot.services.student_tracker import load_student
+from app.bot.services.student_tracker import load_student, save_subject_history
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +19,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def materia_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle /materia — close current session (flush telemetry) and pick a new subject."""
+    """Handle /materia — save history, close session, pick a new subject."""
     session = context.user_data.get("session")
     telegram_id = context.user_data.get("telegram_id")
     if session:
+        if telegram_id:
+            save_subject_history(telegram_id, session.materia_nombre, session.history)
         close_session(session.session_id, session, telegram_id)
         context.user_data.pop("session", None)
 
@@ -30,25 +32,7 @@ async def materia_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     trimestre = context.user_data.get("trimestre")
     keyboard = build_subject_keyboard(carrera=carrera, trimestre=trimestre)
     await update.message.reply_text(
-        STRINGS["new_session"],
-        reply_markup=keyboard,
-    )
-    return State.SELECTING_SUBJECT
-
-
-async def nueva_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle /nueva — start a fresh session (flush telemetry)."""
-    session = context.user_data.get("session")
-    telegram_id = context.user_data.get("telegram_id")
-    if session:
-        close_session(session.session_id, session, telegram_id)
-        context.user_data.pop("session", None)
-
-    carrera = context.user_data.get("career_name")
-    trimestre = context.user_data.get("trimestre")
-    keyboard = build_subject_keyboard(carrera=carrera, trimestre=trimestre)
-    await update.message.reply_text(
-        STRINGS["new_session"],
+        STRINGS["select_subject"],
         reply_markup=keyboard,
     )
     return State.SELECTING_SUBJECT

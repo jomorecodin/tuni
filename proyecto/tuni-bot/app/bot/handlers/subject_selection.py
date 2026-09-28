@@ -6,10 +6,10 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from app.bot.constants import State, STRINGS
-from app.bot.keyboards import get_subject_by_index
+from app.bot.keyboards import get_subject_by_index, build_reply_keyboard
 from app.bot.handlers.class_checkin import should_show_checkin, start_checkin
 from app.bot.services.session_manager import UserSession, create_session
-from app.bot.services.student_tracker import record_session_start
+from app.bot.services.student_tracker import record_session_start, load_subject_history
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,15 @@ async def subject_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         materia_id=materia_id,
         materia_nombre=materia_nombre,
     )
+
+    # Load persisted history for this subject
+    has_history = False
+    if telegram_id and not is_general:
+        prev_history = load_subject_history(telegram_id, materia_nombre)
+        if prev_history:
+            session.history = prev_history
+            has_history = True
+
     context.user_data["session"] = session
 
     # Track in student JSON
@@ -68,9 +77,16 @@ async def subject_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not is_general and should_show_checkin(telegram_id, materia_nombre):
         return await start_checkin(update, context)
 
+    # Send confirmation + persistent reply keyboard
+    reply_kb = build_reply_keyboard()
     if is_general:
         await query.edit_message_text(
             STRINGS["general_selected"],
+            parse_mode="Markdown",
+        )
+    elif has_history:
+        await query.edit_message_text(
+            STRINGS["history_resumed"].format(subject=materia_nombre),
             parse_mode="Markdown",
         )
     else:
@@ -78,4 +94,7 @@ async def subject_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             STRINGS["subject_selected"].format(subject=materia_nombre),
             parse_mode="Markdown",
         )
+
+    # Send reply keyboard (edit_message_text can't attach ReplyKeyboardMarkup)
+    await query.message.reply_text("_ _", reply_markup=reply_kb, parse_mode="Markdown")
     return State.CHATTING

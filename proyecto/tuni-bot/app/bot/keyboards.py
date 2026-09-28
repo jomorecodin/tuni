@@ -1,6 +1,6 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 
-from app.bot.constants import CAREERS, TRIMESTERS
+from app.bot.constants import CAREERS, TRIMESTERS, REPLY_BUTTON_SWITCH
 from app.db.client import get_supabase
 
 
@@ -96,3 +96,12 @@ def get_all_subjects() -> dict[str, tuple[str, str]]:
     if not _subject_cache:
         build_subject_keyboard()
     return _subject_cache
+
+
+def build_reply_keyboard() -> ReplyKeyboardMarkup:
+    """Persistent reply keyboard with 'Cambiar materia' button."""
+    return ReplyKeyboardMarkup(
+        [[REPLY_BUTTON_SWITCH]],
+        resize_keyboard=True,
+        one_time_keyboard=False,
+    )

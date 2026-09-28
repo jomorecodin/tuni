@@ -3,8 +3,8 @@
 Telemetry architecture: interactions are buffered in memory on the UserSession
 object during active conversations. No disk I/O happens per message. The buffer
 is flushed to the student JSON + conversation log only when the session closes
-(30-min timeout, /materia, /nueva). Supabase inserts still happen per message
-since they're non-blocking network calls that run after the response is delivered.
+(timeout or subject switch). Supabase inserts still happen per message since
+they're non-blocking network calls that run after the response is delivered.
 """
 
 import io
@@ -14,12 +14,12 @@ import time
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from app.bot.constants import State, STRINGS
+from app.bot.constants import State, STRINGS, REPLY_BUTTON_SWITCH
 from app.bot.keyboards import build_subject_keyboard, get_all_subjects
 from app.bot.services.intent_detector import detect_subject_switch
 from app.bot.services.latex_renderer import has_renderable_math, render_all_blocks, clean_text
 from app.bot.services.session_manager import UserSession, close_session, create_session
-from app.bot.services.student_tracker import record_session_start
+from app.bot.services.student_tracker import record_session_start, save_subject_history, load_subject_history
 from app.bot.services.streaming import stream_response_to_telegram
 from app.services.llm_client import stream_chat
 from app.db.client import get_supabase
@@ -41,6 +41,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Check session validity — flush telemetry if expired
     if session is None or session.is_expired():
         if session and session.is_expired():
+            # Save subject history before closing
+            if telegram_id:
+                save_subject_history(telegram_id, session.materia_nombre, session.history)
             close_session(session.session_id, session, telegram_id)
             context.user_data.pop("session", None)
             await update.message.reply_text(STRINGS["session_timeout"])
@@ -55,6 +58,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     session.touch()
     user_message = update.message.text
 
+    # Handle "Cambiar materia" button press
+    if user_message == REPLY_BUTTON_SWITCH:
+        if telegram_id:
+            save_subject_history(telegram_id, session.materia_nombre, session.history)
+        close_session(session.session_id, session, telegram_id)
+        context.user_data.pop("session", None)
+
+        carrera = context.user_data.get("career_name")
+        trimestre = context.user_data.get("trimestre")
+        keyboard = build_subject_keyboard(carrera=carrera, trimestre=trimestre)
+        await update.message.reply_text(
+            STRINGS["select_subject"],
+            reply_markup=keyboard,
+        )
+        return State.SELECTING_SUBJECT
+
     # Detect subject switch intent before sending to LLM
     switch_result = detect_subject_switch(
         user_message, session.materia_nombre, get_all_subjects()
@@ -64,6 +83,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         if materia_id == "__ambiguous__":
             # Trigger found but no specific subject — show keyboard
+            if telegram_id:
+                save_subject_history(telegram_id, session.materia_nombre, session.history)
             keyboard = build_subject_keyboard()
             await update.message.reply_text(
                 STRINGS["switch_ambiguous"], reply_markup=keyboard,
@@ -72,7 +93,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             context.user_data.pop("session", None)
             return State.SELECTING_SUBJECT
 
-        # Exact match — close old session, create new one
+        # Exact match — save history for old subject, close, create new
+        if telegram_id:
+            save_subject_history(telegram_id, session.materia_nombre, session.history)
         close_session(session.session_id, session, telegram_id)
         try:
             new_session_id = create_session(session.user_id, materia_id)
@@ -87,9 +110,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             materia_id=materia_id,
             materia_nombre=materia_nombre,
         )
-        context.user_data["session"] = new_session
+        # Load persisted history for the new subject
         if telegram_id:
+            prev_history = load_subject_history(telegram_id, materia_nombre)
+            if prev_history:
+                new_session.history = prev_history
             record_session_start(telegram_id, materia_nombre)
+
+        context.user_data["session"] = new_session
 
         await update.message.reply_text(
             STRINGS["subject_switched"].format(subject=materia_nombre),

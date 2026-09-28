@@ -26,6 +26,7 @@ def create_student_file(telegram_id: int, user_id: str) -> dict:
         "schedule": {"raw_text": None, "parsed": None},
         "subjects_used": [],
         "class_checkins": [],
+        "subject_histories": {},
         "patterns": {
             "total_sessions": 0,
             "total_interactions": 0,
@@ -98,6 +99,28 @@ def update_student(telegram_id: int, updates: dict) -> None:
         return
     _deep_merge(data, updates)
     _save(telegram_id, data)
+
+
+def save_subject_history(telegram_id: int, materia: str, history: list[dict]) -> None:
+    """Persist conversation history for a subject (last N messages)."""
+    data = load_student(telegram_id)
+    if data is None:
+        return
+    max_messages = settings.bot_max_history_messages if hasattr(settings, 'bot_max_history_messages') else 40
+    truncated = history[-max_messages:] if len(history) > max_messages else history
+    histories = data.get("subject_histories", {})
+    histories[materia] = truncated
+    data["subject_histories"] = histories
+    _save(telegram_id, data)
+    logger.debug("Saved %d history messages for %s (student %d)", len(truncated), materia, telegram_id)
+
+
+def load_subject_history(telegram_id: int, materia: str) -> list[dict]:
+    """Load persisted conversation history for a subject."""
+    data = load_student(telegram_id)
+    if data is None:
+        return []
+    return data.get("subject_histories", {}).get(materia, [])
 
 
 def record_session_start(telegram_id: int, subject: str) -> None:

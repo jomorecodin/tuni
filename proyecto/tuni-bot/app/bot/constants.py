@@ -19,6 +19,10 @@ class State(IntEnum):
     REFLECTION_TEACHING = 11
 
 
+# Persistent reply keyboard button text
+REPLY_BUTTON_SWITCH = "Cambiar materia"
+
+
 # Available careers for the pilot
 CAREERS = [
     {"id": "ing_sistemas", "name": "Ingenieria de Sistemas"},
@@ -79,13 +83,19 @@ STRINGS = {
     "error": "Lo siento, ocurrio un error. Intenta de nuevo.",
     "session_timeout": "Tu sesion anterior expiro. Selecciona una materia para continuar.",
     "help": (
-        "*Comandos disponibles:*\n\n"
-        "/start - Iniciar el bot\n"
-        "/materia - Cambiar de materia\n"
-        "/nueva - Nueva sesion\n"
+        "*Como usar TUNI:*\n\n"
+        "Usa el boton *Cambiar materia* en la parte inferior "
+        "para seleccionar otra materia.\n\n"
+        "Tu historial de conversacion se guarda por materia — "
+        "cuando vuelvas, retomamos donde quedamos.\n\n"
+        "*Comandos:*\n"
         "/horario - Subir tu horario\n"
         "/estado - Ver tu progreso\n"
-        "/ayuda - Ver estos comandos"
+        "/ayuda - Ver esta ayuda"
+    ),
+    "history_resumed": (
+        "Retomamos donde quedamos en *{subject}*.\n\n"
+        "Escribe tu pregunta o dime en que necesitas ayuda."
     ),
     "new_session": "Sesion cerrada. Selecciona una materia para continuar.",
     "subject_switched": "Perfecto, cambiamos a *{subject}*! Escribe tu pregunta.",
