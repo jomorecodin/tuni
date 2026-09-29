@@ -5,33 +5,15 @@ class State(IntEnum):
     """ConversationHandler states."""
     AWAITING_CONSENT = 0
     UPLOAD_SCHEDULE = 1
-    SELECTING_CAREER = 2
-    SELECTING_TRIMESTER = 3
-    SELECTING_SUBJECT = 4
-    CHATTING = 5
-    # Class check-in (between subject selection and chatting)
-    CLASS_CHECKIN_ATTENDANCE = 6
-    CLASS_CHECKIN_TOPIC = 7
-    CLASS_CHECKIN_UNCLEAR = 8
+    CHATTING = 2
+    CLASS_CHECKIN_ATTENDANCE = 3
+    CLASS_CHECKIN_TOPIC = 4
+    CLASS_CHECKIN_UNCLEAR = 5
     # Post-exam reflection (separate ConversationHandler, group=1)
-    REFLECTION_SELF_ASSESSMENT = 9
-    REFLECTION_GAPS = 10
-    REFLECTION_TEACHING = 11
-
-
-# Persistent reply keyboard button text
-REPLY_BUTTON_SWITCH = "Cambiar materia"
-
-
-# Available careers for the pilot
-CAREERS = [
-    {"id": "ing_sistemas", "name": "Ingenieria de Sistemas"},
-]
-
-# Available trimesters per career
-TRIMESTERS = {
-    "ing_sistemas": [3, 4, 5],
-}
+    REFLECTION_SELF_ASSESSMENT = 6
+    REFLECTION_GAPS = 7
+    REFLECTION_TEACHING = 8
+    PROFESSOR_AUTH = 9
 
 
 # Spanish UI strings
@@ -49,57 +31,56 @@ STRINGS = {
         "Tu identidad esta protegida y separada de tus interacciones."
     ),
     "onboarding_disclaimer": (
-        "La informacion que te pido a continuacion (horario, carrera, trimestre) "
-        "solo se solicita una vez. Queda guardada para que cada vez mis "
-        "respuestas sean mas precisas y contextualizadas a tu situacion academica."
+        "La informacion que te pido a continuacion solo se solicita una vez. "
+        "Queda guardada para que mis respuestas sean mas precisas y "
+        "contextualizadas a tu situacion academica."
     ),
     "consent_accept": "Acepto participar",
     "consent_decline": "No deseo participar",
     "consent_declined": "Entendido. Si cambias de opinion, escribe /start.",
     "schedule_prompt": (
         "Para personalizar tu experiencia, sube una foto o PDF de tu "
-        "horario semanal (el que genera el sistema de la universidad).\n\n"
+        "cronograma de evaluaciones.\n\n"
+        "Con esto puedo saber que materias cursas, tus fechas de "
+        "evaluacion, y darte mejor asistencia.\n\n"
         "Si prefieres saltarte este paso, escribe /saltar"
     ),
-    "schedule_received": "Horario recibido!",
-    "schedule_skipped": "Sin problema! Puedes subirlo despues con /horario",
-    "select_career": "Cual es tu carrera?",
-    "select_trimester": "En que trimestre estas?",
-    "select_subject": "Selecciona la materia con la que necesitas ayuda:",
-    "subject_selected": (
-        "Perfecto! Estamos en *{subject}*.\n\n"
-        "Como puedo ayudarte?\n"
-        "- Escribe el *tema* que necesitas repasar\n"
-        "- Enviame un *problema* que quieras resolver\n"
-        "- O hazme una *pregunta concreta* sobre la materia\n\n"
-        "Mientras mas especifica tu consulta, mejor te puedo guiar."
+    "schedule_received": (
+        "Cronograma recibido! Procesando...\n"
+        "Esto puede tardar unos segundos."
     ),
-    "general_selected": (
-        "Modo *Consulta General*.\n\n"
-        "Puedes preguntarme sobre procesos, informacion y tramites "
-        "de la Universidad Metropolitana. Escribe tu consulta."
+    "schedule_processed": (
+        "Listo! Ya tengo tu cronograma. Veo que cursas:\n{subjects}\n\n"
+        "Preguntame lo que necesites — puedo ayudarte con cualquiera "
+        "de tus materias, fechas de evaluacion, o consultas generales."
+    ),
+    "schedule_process_error": (
+        "No pude procesar el cronograma automaticamente. "
+        "No te preocupes, puedes usarme normalmente y subir "
+        "otro cronograma despues con /horario.\n\n"
+        "Preguntame lo que necesites!"
+    ),
+    "schedule_skipped": (
+        "Sin problema! Puedes subirlo despues con /horario.\n\n"
+        "Preguntame lo que necesites — puedo ayudarte con materias, "
+        "tramites universitarios, o consultas generales."
     ),
     "thinking": "Pensando...",
     "error": "Lo siento, ocurrio un error. Intenta de nuevo.",
-    "session_timeout": "Tu sesion anterior expiro. Selecciona una materia para continuar.",
+    "session_timeout": (
+        "Tu sesion anterior expiro. Escribe tu pregunta para continuar."
+    ),
     "help": (
         "*Como usar TUNI:*\n\n"
-        "Usa el boton *Cambiar materia* en la parte inferior "
-        "para seleccionar otra materia.\n\n"
-        "Tu historial de conversacion se guarda por materia — "
-        "cuando vuelvas, retomamos donde quedamos.\n\n"
+        "Simplemente escribe tu pregunta o duda. Puedo ayudarte con:\n"
+        "- Materias academicas (matematica, teoria, ejercicios)\n"
+        "- Fechas y cronograma de evaluaciones\n"
+        "- Informacion y tramites de la universidad\n\n"
         "*Comandos:*\n"
-        "/horario - Subir tu horario\n"
+        "/horario - Subir tu cronograma\n"
         "/estado - Ver tu progreso\n"
         "/ayuda - Ver esta ayuda"
     ),
-    "history_resumed": (
-        "Retomamos donde quedamos en *{subject}*.\n\n"
-        "Escribe tu pregunta o dime en que necesitas ayuda."
-    ),
-    "new_session": "Sesion cerrada. Selecciona una materia para continuar.",
-    "subject_switched": "Perfecto, cambiamos a *{subject}*! Escribe tu pregunta.",
-    "switch_ambiguous": "Quieres cambiar de materia? Selecciona una:",
     # Class check-in strings
     "checkin_attendance_eval": (
         "Antes de empezar, cuentame un poco sobre {materia}. "
@@ -131,8 +112,7 @@ STRINGS = {
         "(Escribe 'no' si no tienes comentarios sobre eso)"
     ),
     "reflection_thanks": (
-        "Gracias por tu reflexion! Esto me ayuda a entender mejor como apoyarte. "
-        "Si necesitas repasar algo, puedes seleccionar una materia cuando quieras."
+        "Gracias por tu reflexion! Esto me ayuda a entender mejor como apoyarte."
     ),
     "status": (
         "*Tu progreso con TUNI:*\n\n"
@@ -140,5 +120,16 @@ STRINGS = {
         "Interacciones: {total_interactions}\n"
         "Materias usadas: {subjects_used}\n"
         "Profundidad promedio: {avg_depth} mensajes/sesion"
+    ),
+    # Professor strings
+    "professor_prompt": "Ingresa la clave de acceso para el modo profesor:",
+    "professor_auth_success": (
+        "Acceso concedido. Modo profesor activado.\n\n"
+        "Puedes hacerme preguntas sobre los datos del piloto, "
+        "brechas detectadas, patrones de uso, o subir material."
+    ),
+    "professor_auth_fail": "Clave incorrecta. Intenta de nuevo o escribe /start para volver.",
+    "professor_welcome_back": (
+        "Bienvenido de vuelta, profesor. Escribe su consulta."
     ),
 }

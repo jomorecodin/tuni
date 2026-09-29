@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, MessageSquare, ClipboardCheck, CalendarClock } from "lucide-react";
+import { Users, MessageSquare, ClipboardCheck, CalendarClock, Database } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -12,19 +12,46 @@ import {
 } from "recharts";
 import { StatsCard } from "@/components/StatsCard";
 import { getPilotHealth, getWeeklyReport, type PilotHealth, type WeeklyReport } from "@/lib/api";
+import { getSessionCount, getInteractionCount, getStudentCount, getTodaySessionCount } from "@/lib/supabase";
 
 export default function DashboardPage() {
   const [health, setHealth] = useState<PilotHealth | null>(null);
   const [report, setReport] = useState<WeeklyReport | null>(null);
+  const [dbStats, setDbStats] = useState<{
+    sessions: number;
+    interactions: number;
+    students: number;
+    todaySessions: number;
+  } | null>(null);
   const [error, setError] = useState("");
+  const [apiError, setApiError] = useState(false);
 
   useEffect(() => {
+    // Fetch from local API (may fail if tunnel is down)
     Promise.all([getPilotHealth(), getWeeklyReport(2)])
       .then(([h, r]) => {
         setHealth(h);
         setReport(r);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => {
+        setApiError(true);
+        console.warn("API unavailable:", e.message);
+      });
+
+    // Fetch from Supabase directly (always available)
+    Promise.all([
+      getSessionCount(),
+      getInteractionCount(),
+      getStudentCount(),
+      getTodaySessionCount(),
+    ])
+      .then(([sessions, interactions, students, todaySessions]) => {
+        setDbStats({ sessions, interactions, students, todaySessions });
+      })
+      .catch((e) => {
+        console.warn("Supabase unavailable:", e.message);
+        setError(e.message);
+      });
   }, []);
 
   if (error) {
@@ -39,49 +66,58 @@ export default function DashboardPage() {
     );
   }
 
-  if (!health || !report) {
+  if (!health && !dbStats) {
     return <div className="p-8 text-gray-500">Cargando datos del piloto...</div>;
   }
 
-  const subjectData = Object.entries(health.subject_usage_week).map(([name, count]) => ({
-    name: name.length > 20 ? name.slice(0, 18) + "..." : name,
-    sesiones: count,
-  }));
+  const subjectData = health
+    ? Object.entries(health.subject_usage_week).map(([name, count]) => ({
+        name: name.length > 20 ? name.slice(0, 18) + "..." : name,
+        sesiones: count,
+      }))
+    : [];
 
-  const topGaps = report.top_gaps.slice(0, 8);
+  const topGaps = report ? report.top_gaps.slice(0, 8) : [];
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Panel del Piloto</h1>
         <p className="text-sm text-gray-500">
-          Ultima actualizacion: {new Date(health.timestamp).toLocaleString("es-VE")}
+          {health
+            ? `Ultima actualizacion: ${new Date(health.timestamp).toLocaleString("es-VE")}`
+            : "Datos de Supabase (API local no disponible)"}
         </p>
+        {apiError && (
+          <p className="text-xs text-amber-600 mt-1">
+            API local no disponible — mostrando datos de Supabase
+          </p>
+        )}
       </div>
 
-      {/* Stats grid */}
+      {/* Stats grid — uses Supabase as primary, API as enrichment */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatsCard
           title="Estudiantes registrados"
-          value={health.registered_students}
-          subtitle={`${health.active_students_week} activos esta semana`}
+          value={dbStats?.students ?? health?.registered_students ?? 0}
+          subtitle={health ? `${health.active_students_week} activos esta semana` : "Supabase"}
           icon={<Users size={18} />}
         />
         <StatsCard
           title="Sesiones hoy"
-          value={health.sessions_today}
-          subtitle={`${health.sessions_this_week} esta semana`}
+          value={dbStats?.todaySessions ?? health?.sessions_today ?? 0}
+          subtitle={`${dbStats?.sessions ?? health?.sessions_this_week ?? 0} total`}
           icon={<MessageSquare size={18} />}
         />
         <StatsCard
-          title="Check-ins"
-          value={health.total_checkins}
-          subtitle="Registros de clase completados"
-          icon={<ClipboardCheck size={18} />}
+          title="Interacciones totales"
+          value={dbStats?.interactions ?? 0}
+          subtitle="Mensajes en Supabase"
+          icon={<Database size={18} />}
         />
         <StatsCard
           title="Reflexiones"
-          value={health.total_reflections}
+          value={health?.total_reflections ?? 0}
           subtitle="Post-examen completadas"
           icon={<CalendarClock size={18} />}
         />
@@ -131,7 +167,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Upcoming evaluations */}
-      {health.upcoming_evaluations.length > 0 && (
+      {health && health.upcoming_evaluations.length > 0 && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <h3 className="font-medium mb-3">Evaluaciones proximas</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -161,6 +197,7 @@ export default function DashboardPage() {
       )}
 
       {/* Overview period */}
+      {report && (
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <h3 className="font-medium mb-3">Resumen del periodo ({report.period.start} - {report.period.end})</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center text-sm">
@@ -186,6 +223,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

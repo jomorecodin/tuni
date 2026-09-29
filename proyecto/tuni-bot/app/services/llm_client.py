@@ -1,6 +1,9 @@
-"""
-LLM client abstraction — supports Gemini (dev/test) and Ollama (production).
-Provides a unified async generator interface for streaming chat completions.
+"""LLM client abstraction — supports Gemini (dev/test) and Ollama (production).
+
+Workload split:
+- Student chat: qwen3:8b via Ollama (high volume, unlimited tokens)
+- Professor chat: Gemini (infrequent, keeps qwen free for students)
+- Document analysis: Gemini (multimodal, handled by gemini_vision.py)
 """
 
 import json
@@ -10,41 +13,49 @@ from typing import AsyncGenerator
 import httpx
 
 from app.core.config import settings
-from app.services.prompt_loader import build_system_prompt
+from app.services.prompt_loader import build_system_prompt, build_professor_prompt
 
 
 async def stream_chat(
     messages: list[dict[str, str]],
-    mode: str,
-    materia_nombre: str = "General",
-    carrera: str | None = None,
-    trimestre: int | None = None,
+    student_subjects: list[str] | None = None,
+    cronograma: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
-    """Stream a chat completion, yielding token chunks.
+    """Stream a student chat completion, yielding token chunks.
 
-    Yields dicts with either:
-      {"done": False, "content": "token_text"}
-      {"done": True, "total_tokens": N, "elapsed_ms": M}
+    Uses Ollama (qwen3:8b) in production, Gemini in dev/test.
     """
+    system_prompt = build_system_prompt(student_subjects, cronograma)
+
     if settings.llm_provider == "gemini":
-        async for chunk in _stream_gemini(messages, mode, materia_nombre, carrera, trimestre):
+        async for chunk in _stream_gemini(messages, system_prompt):
             yield chunk
     else:
-        async for chunk in _stream_ollama(messages, mode, materia_nombre, carrera, trimestre):
+        async for chunk in _stream_ollama(messages, system_prompt):
             yield chunk
+
+
+async def stream_professor_chat(
+    messages: list[dict[str, str]],
+    data_context: str = "",
+) -> AsyncGenerator[dict, None]:
+    """Stream a professor chat completion — always uses Gemini.
+
+    Keeps qwen3:8b free for student conversations.
+    """
+    system_prompt = build_professor_prompt()
+    if data_context:
+        system_prompt += f"\n\nDATOS DEL PILOTO:\n{data_context}"
+
+    async for chunk in _stream_gemini(messages, system_prompt):
+        yield chunk
 
 
 async def _stream_gemini(
     messages: list[dict[str, str]],
-    mode: str,
-    materia_nombre: str,
-    carrera: str | None = None,
-    trimestre: int | None = None,
+    system_prompt: str,
 ) -> AsyncGenerator[dict, None]:
     """Stream from Gemini API using REST endpoint."""
-    system_prompt = build_system_prompt(mode, materia_nombre, carrera, trimestre)
-
-    # Build Gemini contents format
     contents = []
     for msg in messages:
         role = "user" if msg["role"] == "user" else "model"
@@ -101,14 +112,9 @@ async def _stream_gemini(
 
 async def _stream_ollama(
     messages: list[dict[str, str]],
-    mode: str,
-    materia_nombre: str,
-    carrera: str | None = None,
-    trimestre: int | None = None,
+    system_prompt: str,
 ) -> AsyncGenerator[dict, None]:
     """Stream from Ollama local API."""
-    system_prompt = build_system_prompt(mode, materia_nombre, carrera, trimestre)
-
     ollama_messages = [
         {"role": "system", "content": system_prompt},
         *messages,

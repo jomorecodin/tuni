@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timezone
 
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, ConversationHandler
 
 from app.bot.constants import State, STRINGS
 from app.bot.services.student_tracker import load_student, update_student
@@ -37,14 +37,14 @@ async def reflection_self_assessment_callback(
     parts = query.data.rsplit("_", 2)
     if len(parts) < 3:
         await query.edit_message_text("Error procesando respuesta.")
-        return State.SELECTING_SUBJECT
+        return ConversationHandler.END
 
     hash_id = parts[-2]
     try:
         score = int(parts[-1])
     except ValueError:
         await query.edit_message_text("Error procesando respuesta.")
-        return State.SELECTING_SUBJECT
+        return ConversationHandler.END
 
     telegram_id = update.effective_user.id
 
@@ -61,7 +61,7 @@ async def reflection_self_assessment_callback(
 
     if not meta:
         await query.edit_message_text("Gracias por tu respuesta!")
-        return State.SELECTING_SUBJECT
+        return ConversationHandler.END
 
     # Store context for follow-up questions
     context.user_data["active_reflection"] = {
@@ -166,7 +166,7 @@ async def reflection_teaching_response(
     context.user_data.pop("active_reflection", None)
 
     await update.message.reply_text(STRINGS["reflection_thanks"])
-    return State.SELECTING_SUBJECT
+    return ConversationHandler.END
 
 
 def _calc_delay(reflection: dict) -> float | None:

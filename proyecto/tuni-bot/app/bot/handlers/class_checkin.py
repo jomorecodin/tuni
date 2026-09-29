@@ -40,10 +40,11 @@ def should_show_checkin(telegram_id: int, materia_nombre: str) -> bool:
     return len(recent) == 0
 
 
-async def start_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Begin the class check-in flow after subject selection."""
+async def start_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE, materia: str = "") -> int:
+    """Begin the class check-in flow."""
     query = update.callback_query
-    materia = context.user_data["session"].materia_nombre
+    if not materia:
+        materia = context.user_data.get("checkin_materia", "la materia")
 
     context.user_data["checkin_data"] = {
         "materia": materia,
@@ -168,10 +169,8 @@ async def _save_and_start_chatting(update: Update, context: ContextTypes.DEFAULT
             parse_mode="Markdown",
         )
     else:
-        materia_name = checkin.get("materia", "la materia")
         await update.message.reply_text(
-            STRINGS["subject_selected"].format(subject=materia_name),
-            parse_mode="Markdown",
+            "Listo! Escribe tu pregunta.",
         )
 
     context.user_data.pop("checkin_data", None)
@@ -180,13 +179,9 @@ async def _save_and_start_chatting(update: Update, context: ContextTypes.DEFAULT
 
 async def _finish_checkin_skip(query, context) -> int:
     """Skip check-in, go directly to CHATTING."""
-    session = context.user_data.get("session")
-    materia = session.materia_nombre if session else "la materia"
-
     context.user_data.pop("checkin_data", None)
 
     await query.edit_message_text(
-        STRINGS["subject_selected"].format(subject=materia),
-        parse_mode="Markdown",
+        "Listo! Escribe tu pregunta.",
     )
     return State.CHATTING

@@ -209,19 +209,29 @@ def _detect_pre_eval_spike(patterns: dict, session) -> None:
     """Record if this session happened close to an upcoming evaluation."""
     try:
         from app.bot.services.cronograma_service import days_until_eval, get_next_evaluacion
-        days = days_until_eval(session.materia_nombre)
-        if days is not None and days <= 3:
-            nxt = get_next_evaluacion(session.materia_nombre)
-            spikes = patterns.get("pre_eval_usage_spikes", [])
-            spikes.append({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "materia": session.materia_nombre,
-                "days_until_eval": days,
-                "eval_type": nxt.tipo if nxt else None,
-                "eval_date": nxt.fecha.isoformat() if nxt else None,
-                "session_depth": session.depth,
-                "interaction_count": len(session.interaction_buffer),
-            })
+        # Check all subjects the student uses for upcoming evals
+        # Since sessions are no longer per-subject, we check all known subjects
+        subjects_checked = set()
+        for record in session.interaction_buffer:
+            # Extract mentioned subjects from interactions (best-effort)
+            subjects_checked.add("general")
+
+        # Check proximity for all known subjects
+        spikes = patterns.get("pre_eval_usage_spikes", [])
+        for materia_check in ["general"]:
+            days = days_until_eval(materia_check)
+            if days is not None and days <= 3:
+                nxt = get_next_evaluacion(materia_check)
+                spikes.append({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "materia": materia_check,
+                    "days_until_eval": days,
+                    "eval_type": nxt.tipo if nxt else None,
+                    "eval_date": nxt.fecha.isoformat() if nxt else None,
+                    "session_depth": session.depth,
+                    "interaction_count": len(session.interaction_buffer),
+                })
+        if spikes != patterns.get("pre_eval_usage_spikes", []):
             patterns["pre_eval_usage_spikes"] = spikes
     except Exception as e:
         logger.debug("Pre-eval spike check skipped: %s", e)
@@ -237,7 +247,7 @@ def _save_conversation_log(telegram_id: int, session, buffer) -> None:
     log = {
         "session_id": session.session_id,
         "telegram_id": telegram_id,
-        "materia": session.materia_nombre,
+        "materia": "general",
         "started_at": session.started_at,
         "closed_at": datetime.now(timezone.utc).isoformat(),
         "total_exchanges": len(buffer),

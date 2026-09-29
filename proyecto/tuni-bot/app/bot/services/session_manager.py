@@ -31,8 +31,7 @@ class UserSession:
     """In-memory state for an active Telegram user session."""
     user_id: str
     session_id: str
-    materia_id: str
-    materia_nombre: str
+    role: str = "student"  # "student" or "professor"
     history: list[dict[str, str]] = field(default_factory=list)
     last_activity: float = field(default_factory=time.monotonic)
     message_count: int = 0
@@ -74,16 +73,14 @@ class UserSession:
         ))
 
 
-def create_session(user_id: str, materia_id: str | None) -> str:
+def create_session(user_id: str, role: str = "student") -> str:
     """Create a new session in Supabase. Returns session_id."""
     sb = get_supabase()
     row = {
         "user_id": user_id,
-        "modo_inicial": "tutor",
+        "modo_inicial": "agentic",
         "dispositivo": "telegram",
     }
-    if materia_id:
-        row["materia_declarada"] = materia_id
     result = sb.table("sesion").insert(row).execute()
     session_id = result.data[0]["id_sesion"]
     logger.info("Created session %s for user %s", session_id, user_id)

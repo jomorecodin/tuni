@@ -4,9 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TUNI is a pilot platform for investigating how generative AI impacts university student learning, developed as a bachelor's thesis at Universidad Metropolitana de Caracas. It provides students with an LLM assistant in two modes (neutral and academic tutor), collects detailed telemetry on interactions, and feeds a pedagogical analytics dashboard for the researcher.
+TUNI is a pilot platform for investigating how generative AI impacts university student learning, developed as a bachelor's thesis at Universidad Metropolitana de Caracas. It provides students and professors with a single agentic LLM assistant via Telegram bot, collects detailed telemetry on interactions, and feeds a pedagogical analytics dashboard.
 
-The active codebase is in `proyecto/claude_code_setup/`. The `tuni/` directory is an older prototype and should be ignored.
+The active codebase is in `proyecto/tuni-bot/`. The `tuni/` and `proyecto/claude_code_setup/` directories are older prototypes and should be ignored.
+
+## Critical Design Decisions (September 2026)
+
+1. **Single agentic model** — NO more dual modes (tutor/neutral). The bot is one unified agent that manages interactions, adapts its behavior based on context, and handles all user types.
+
+2. **Two user roles via tokens:**
+   - **Students** — default role. The agent knows their subjects from the cronograma, assists with academics, tracks telemetry.
+   - **Professors** — authenticated via pre-generated tokens. They get access to aggregated analytics of their subjects, gap reports, usage patterns. They do NOT see individual student conversations (privacy). Professors can also update cronogramas and provide context about their teaching.
+
+3. **No button-based subject selection** — The agent infers the subject from conversation context. The cronograma already defines what subjects exist. Students don't need to manually select career → trimester → subject.
+
+4. **Local knowledge bank** — The bot must NOT depend on web searches. Each subject has a `context/` folder with curriculum content (.md files) that the agent uses as reference. These need to be populated with real content: key concepts, formulas, common problems, syllabus topics.
+
+5. **Supabase as primary data layer** — Both for telemetry storage AND for the AI consultation module (text-to-SQL exploratory analysis on raw empirical data).
+
+6. **Deployment** — CT (LXC container) on Proxmox with Ubuntu, Ollama for local inference (qwen3:8b), systemd services. Dashboard on Vercel, API exposed via Cloudflare tunnel.
 
 ## Repository Structure
 

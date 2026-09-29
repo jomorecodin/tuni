@@ -1,4 +1,11 @@
-"""TUNI Telegram bot application setup and entry point."""
+"""TUNI Telegram bot application setup and entry point.
+
+Architecture:
+- Single agentic model (no dual modes)
+- Simplified onboarding: /start → consent → cronograma upload → CHATTING
+- Professor role via /profesor + universal password
+- Document uploads handled mid-conversation via Gemini multimodal
+"""
 
 import logging
 
@@ -20,10 +27,6 @@ from app.bot.handlers.start import (
     schedule_upload,
     skip_schedule,
 )
-from app.bot.handlers.career_selection import (
-    career_callback, trimester_callback, back_to_career, back_to_trimester,
-)
-from app.bot.handlers.subject_selection import subject_callback
 from app.bot.handlers.class_checkin import (
     attendance_callback,
     topic_response,
@@ -32,10 +35,12 @@ from app.bot.handlers.class_checkin import (
 from app.bot.handlers.chat import handle_message
 from app.bot.handlers.commands import (
     help_command,
-    materia_command,
     estado_command,
     horario_command,
+    profesor_command,
 )
+from app.bot.handlers.professor import professor_auth
+from app.bot.handlers.document_upload import handle_document
 from app.bot.services.cronograma_service import load_all_cronogramas
 from app.bot.services.scheduler import post_init
 from app.bot.handlers.reflection import (
@@ -75,17 +80,6 @@ def create_application():
                 ),
                 CommandHandler("saltar", skip_schedule),
             ],
-            State.SELECTING_CAREER: [
-                CallbackQueryHandler(career_callback, pattern="^career_"),
-            ],
-            State.SELECTING_TRIMESTER: [
-                CallbackQueryHandler(back_to_career, pattern="^back_career$"),
-                CallbackQueryHandler(trimester_callback, pattern="^trimester_"),
-            ],
-            State.SELECTING_SUBJECT: [
-                CallbackQueryHandler(back_to_trimester, pattern="^back_trimester$"),
-                CallbackQueryHandler(subject_callback, pattern="^subject_"),
-            ],
             State.CLASS_CHECKIN_ATTENDANCE: [
                 CallbackQueryHandler(attendance_callback, pattern="^checkin_"),
             ],
@@ -95,15 +89,20 @@ def create_application():
             State.CLASS_CHECKIN_UNCLEAR: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, unclear_response),
             ],
+            State.PROFESSOR_AUTH: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, professor_auth),
+            ],
             State.CHATTING: [
-                CommandHandler("materia", materia_command),
                 CommandHandler("horario", horario_command),
+                CommandHandler("profesor", profesor_command),
+                MessageHandler(filters.PHOTO | filters.Document.ALL, handle_document),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message),
             ],
         },
         fallbacks=[
             CommandHandler("start", start_command),
             CommandHandler("ayuda", help_command),
+            CommandHandler("profesor", profesor_command),
         ],
         name="tuni_conversation",
         persistent=True,
@@ -113,7 +112,7 @@ def create_application():
 
     app.add_handler(conv_handler)
 
-    # Reflection handler (separate from main conversation — handles proactive messages)
+    # Reflection handler (separate — handles proactive post-exam messages)
     reflection_conv = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(

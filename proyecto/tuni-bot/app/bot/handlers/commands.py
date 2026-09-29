@@ -1,4 +1,4 @@
-"""Slash command handlers: /ayuda, /materia, /estado, /horario."""
+"""Slash command handlers: /ayuda, /estado, /horario, /profesor."""
 
 import logging
 
@@ -6,9 +6,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from app.bot.constants import State, STRINGS
-from app.bot.keyboards import build_subject_keyboard
-from app.bot.services.session_manager import close_session
-from app.bot.services.student_tracker import load_student, save_subject_history
+from app.bot.services.student_tracker import load_student
 
 logger = logging.getLogger(__name__)
 
@@ -16,26 +14,6 @@ logger = logging.getLogger(__name__)
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /ayuda — show available commands."""
     await update.message.reply_text(STRINGS["help"], parse_mode="Markdown")
-
-
-async def materia_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle /materia — save history, close session, pick a new subject."""
-    session = context.user_data.get("session")
-    telegram_id = context.user_data.get("telegram_id")
-    if session:
-        if telegram_id:
-            save_subject_history(telegram_id, session.materia_nombre, session.history)
-        close_session(session.session_id, session, telegram_id)
-        context.user_data.pop("session", None)
-
-    carrera = context.user_data.get("career_name")
-    trimestre = context.user_data.get("trimestre")
-    keyboard = build_subject_keyboard(carrera=carrera, trimestre=trimestre)
-    await update.message.reply_text(
-        STRINGS["select_subject"],
-        reply_markup=keyboard,
-    )
-    return State.SELECTING_SUBJECT
 
 
 async def estado_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -68,3 +46,9 @@ async def horario_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """Handle /horario — prompt schedule upload."""
     await update.message.reply_text(STRINGS["schedule_prompt"])
     return State.UPLOAD_SCHEDULE
+
+
+async def profesor_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle /profesor — enter professor authentication flow."""
+    await update.message.reply_text(STRINGS["professor_prompt"])
+    return State.PROFESSOR_AUTH

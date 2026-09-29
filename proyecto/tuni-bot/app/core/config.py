@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # Telegram
     telegram_bot_token: str = ""
 
+    # Professor
+    professor_password: str = ""
+
     # Bot behavior
     bot_session_timeout_minutes: int = 30
     bot_max_history_messages: int = 40

@@ -1,10 +1,12 @@
 """Main chat handler — receives messages, streams LLM response, buffers telemetry.
 
+Single agentic model: no mode selection, no subject switching. The LLM handles
+all subjects based on the student's cronograma context.
+
 Telemetry architecture: interactions are buffered in memory on the UserSession
 object during active conversations. No disk I/O happens per message. The buffer
-is flushed to the student JSON + conversation log only when the session closes
-(timeout or subject switch). Supabase inserts still happen per message since
-they're non-blocking network calls that run after the response is delivered.
+is flushed to the student JSON + conversation log only when the session closes.
+Supabase inserts still happen per message (non-blocking network calls).
 """
 
 import io
@@ -14,15 +16,14 @@ import time
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from app.bot.constants import State, STRINGS, REPLY_BUTTON_SWITCH
-from app.bot.keyboards import build_subject_keyboard, get_all_subjects
-from app.bot.services.intent_detector import detect_subject_switch
+from app.bot.constants import State, STRINGS
 from app.bot.services.latex_renderer import has_renderable_math, render_all_blocks, clean_text
 from app.bot.services.session_manager import UserSession, close_session, create_session
-from app.bot.services.student_tracker import record_session_start, save_subject_history, load_subject_history
+from app.bot.services.student_tracker import record_session_start, load_student
 from app.bot.services.streaming import stream_response_to_telegram
-from app.services.llm_client import stream_chat
+from app.services.llm_client import stream_chat, stream_professor_chat
 from app.db.client import get_supabase
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -33,99 +34,52 @@ SELF_CORRECTION_PHRASES = [
 ]
 
 
+def _get_student_context(telegram_id: int | None) -> tuple[list[str] | None, dict | None]:
+    """Load student subjects and cronograma from their profile."""
+    if not telegram_id:
+        return None, None
+    data = load_student(telegram_id)
+    if not data:
+        return None, None
+    subjects = data.get("subjects_used", []) or None
+    cronograma = data.get("cronograma") or None
+    return subjects, cronograma
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle a text message in CHATTING state."""
     session: UserSession | None = context.user_data.get("session")
     telegram_id = context.user_data.get("telegram_id")
 
-    # Check session validity — flush telemetry if expired
+    # Check session validity — create new one if expired
     if session is None or session.is_expired():
         if session and session.is_expired():
-            # Save subject history before closing
-            if telegram_id:
-                save_subject_history(telegram_id, session.materia_nombre, session.history)
             close_session(session.session_id, session, telegram_id)
             context.user_data.pop("session", None)
             await update.message.reply_text(STRINGS["session_timeout"])
 
-        keyboard = build_subject_keyboard()
-        await update.message.reply_text(
-            STRINGS["select_subject"],
-            reply_markup=keyboard,
-        )
-        return State.SELECTING_SUBJECT
+        # Auto-create a new session
+        user_id = context.user_data.get("user_id")
+        if not user_id:
+            await update.message.reply_text("Usa /start primero.")
+            return State.CHATTING
+
+        try:
+            session_id = create_session(user_id)
+        except Exception as e:
+            logger.error("Failed to create session: %s", e)
+            await update.message.reply_text(STRINGS["error"])
+            return State.CHATTING
+
+        session = UserSession(user_id=user_id, session_id=session_id)
+        context.user_data["session"] = session
+        if telegram_id:
+            record_session_start(telegram_id, "general")
 
     session.touch()
     user_message = update.message.text
 
-    # Handle "Cambiar materia" button press
-    if user_message == REPLY_BUTTON_SWITCH:
-        if telegram_id:
-            save_subject_history(telegram_id, session.materia_nombre, session.history)
-        close_session(session.session_id, session, telegram_id)
-        context.user_data.pop("session", None)
-
-        carrera = context.user_data.get("career_name")
-        trimestre = context.user_data.get("trimestre")
-        keyboard = build_subject_keyboard(carrera=carrera, trimestre=trimestre)
-        await update.message.reply_text(
-            STRINGS["select_subject"],
-            reply_markup=keyboard,
-        )
-        return State.SELECTING_SUBJECT
-
-    # Detect subject switch intent before sending to LLM
-    switch_result = detect_subject_switch(
-        user_message, session.materia_nombre, get_all_subjects()
-    )
-    if switch_result is not None:
-        materia_id, materia_nombre = switch_result
-
-        if materia_id == "__ambiguous__":
-            # Trigger found but no specific subject — show keyboard
-            if telegram_id:
-                save_subject_history(telegram_id, session.materia_nombre, session.history)
-            keyboard = build_subject_keyboard()
-            await update.message.reply_text(
-                STRINGS["switch_ambiguous"], reply_markup=keyboard,
-            )
-            close_session(session.session_id, session, telegram_id)
-            context.user_data.pop("session", None)
-            return State.SELECTING_SUBJECT
-
-        # Exact match — save history for old subject, close, create new
-        if telegram_id:
-            save_subject_history(telegram_id, session.materia_nombre, session.history)
-        close_session(session.session_id, session, telegram_id)
-        try:
-            new_session_id = create_session(session.user_id, materia_id)
-        except Exception as e:
-            logger.error("Failed to create session on switch: %s", e)
-            await update.message.reply_text(STRINGS["error"])
-            return State.CHATTING
-
-        new_session = UserSession(
-            user_id=session.user_id,
-            session_id=new_session_id,
-            materia_id=materia_id,
-            materia_nombre=materia_nombre,
-        )
-        # Load persisted history for the new subject
-        if telegram_id:
-            prev_history = load_subject_history(telegram_id, materia_nombre)
-            if prev_history:
-                new_session.history = prev_history
-            record_session_start(telegram_id, materia_nombre)
-
-        context.user_data["session"] = new_session
-
-        await update.message.reply_text(
-            STRINGS["subject_switched"].format(subject=materia_nombre),
-            parse_mode="Markdown",
-        )
-        return State.CHATTING
-
-    # Detect self-correction (checked later when buffering)
+    # Detect self-correction
     lower_msg = user_message.lower()
     is_self_correction = any(phrase in lower_msg for phrase in SELF_CORRECTION_PHRASES)
 
@@ -136,13 +90,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Send "thinking" placeholder
     thinking_msg = await update.message.reply_text(STRINGS["thinking"])
 
-    # Stream LLM response with progressive editing
+    # Stream LLM response
     try:
-        carrera = context.user_data.get("career_name")
-        trimestre = context.user_data.get("trimestre")
-        is_general = session.materia_id == "__general__"
-        mode = "general" if is_general else "tutor"
-        token_gen = stream_chat(messages, mode, session.materia_nombre, carrera, trimestre)
+        if session.role == "professor":
+            # Professor uses Gemini — keeps qwen free for students
+            from app.bot.services.analysis_engine import build_ai_context
+            data_context = build_ai_context()
+            token_gen = stream_professor_chat(messages, data_context)
+        else:
+            # Student uses Ollama (production) or Gemini (dev)
+            student_subjects, cronograma = _get_student_context(telegram_id)
+            token_gen = stream_chat(messages, student_subjects, cronograma)
+
         full_response, total_tokens, elapsed_ms = await stream_response_to_telegram(
             thinking_msg, token_gen
         )
@@ -151,7 +110,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await thinking_msg.edit_text(STRINGS["error"])
         return State.CHATTING
 
-    # Render LaTeX blocks as images and send after the text
+    # Render LaTeX blocks as images
     if has_renderable_math(full_response):
         try:
             images = render_all_blocks(full_response)
@@ -167,7 +126,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             logger.warning("LaTeX rendering failed, keeping raw text: %s", e)
 
     # Update conversation history (keep last N messages)
-    max_history = 40
+    max_history = settings.bot_max_history_messages
     session.history.append({"role": "user", "content": user_message})
     session.history.append({"role": "assistant", "content": full_response})
     if len(session.history) > max_history:
@@ -183,11 +142,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         self_correction=is_self_correction,
     )
 
-    # Record interaction in Supabase (non-blocking network call, runs after response)
+    # Record interaction in Supabase
     try:
         get_supabase().table("interaccion").insert({
             "id_sesion": session.session_id,
-            "modo_seleccionado": "tutor",
+            "modo_seleccionado": "agentic",
             "prompt_estudiante": user_message,
             "respuesta_modelo": full_response,
             "longitud_prompt_tokens": len(user_message.split()),
@@ -197,7 +156,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     except Exception as e:
         logger.error("Failed to record interaction: %s", e)
 
-    # Record behavioral event in Supabase
+    # Record behavioral event
     try:
         get_supabase().table("evento_interaccion").insert({
             "id_sesion": session.session_id,
@@ -207,6 +166,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 "response_length_chars": len(full_response),
                 "generation_time_ms": elapsed_ms,
                 "session_depth": session.depth,
+                "role": session.role,
             },
         }).execute()
     except Exception as e:
