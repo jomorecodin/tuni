@@ -129,6 +129,7 @@ async def _stream_ollama(
 
     start_time = time.monotonic()
     total_tokens = 0
+    in_think_block = False
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         async with client.stream(
@@ -151,6 +152,18 @@ async def _stream_ollama(
                     }
                 else:
                     token = chunk.get("message", {}).get("content", "")
-                    if token:
-                        total_tokens += 1
-                        yield {"done": False, "content": token}
+                    if not token:
+                        continue
+
+                    # Filter out qwen3 <think>...</think> blocks
+                    if "<think>" in token:
+                        in_think_block = True
+                        continue
+                    if "</think>" in token:
+                        in_think_block = False
+                        continue
+                    if in_think_block:
+                        continue
+
+                    total_tokens += 1
+                    yield {"done": False, "content": token}
