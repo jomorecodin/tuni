@@ -38,12 +38,20 @@ def load_subject_context(materia_nombre: str) -> str | None:
         for trimestre_dir in career_dir.iterdir():
             if not trimestre_dir.is_dir():
                 continue
+            # Exact match first
             path = trimestre_dir / f"{materia_slug}.md"
             if path.exists():
                 try:
                     return path.read_text(encoding="utf-8")
                 except OSError:
                     continue
+            # Prefix match for truncated names (e.g. "algebra_linea" → "algebra_lineal.md")
+            for md_file in trimestre_dir.glob("*.md"):
+                if md_file.stem.startswith(materia_slug):
+                    try:
+                        return md_file.read_text(encoding="utf-8")
+                    except OSError:
+                        continue
     return None
 
 
