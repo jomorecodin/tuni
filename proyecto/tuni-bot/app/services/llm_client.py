@@ -131,6 +131,7 @@ async def _stream_ollama(
             "repeat_penalty": 1.1,
             "num_predict": 1024,
         },
+        "think": False,
     }
 
     start_time = time.monotonic()
