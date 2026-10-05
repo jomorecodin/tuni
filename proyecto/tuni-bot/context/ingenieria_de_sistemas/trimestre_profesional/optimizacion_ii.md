@@ -46,7 +46,10 @@
 
 ## Plan de Evaluacion
 
-(Pendiente — confirmar fechas y ponderaciones con el profesor Vivas Garcia para el trimestre actual)
+- Examen Parcial I (30%) — Jueves 15/10/2026, Semana 5 — Tema 1
+- Entrega Proyecto (30%) — Semana 10 (~19/11/2026) — Temas 1,2,3,4,6
+- Examen Parcial II (25%) — Jueves 26/11/2026, Semana 11 — Temas 2,3,4,6,7
+- Entrega Tarea Practica (15%) — Semana 12 (~01/12/2026) — Temas 5 y 7
 
 ## Bibliografia
 - Hillier & Lieberman (2001). Investigacion de Operaciones. 7ma Ed. McGraw-Hill.
